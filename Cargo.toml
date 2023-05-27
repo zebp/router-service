@@ -1,0 +1,18 @@
+[package]
+name = "router-service"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures-util = "0.3.28"
+http = "0.2.9"
+matchit = "0.7.0"
+tower = "0.4.13"
+
+[dev-dependencies]
+futures = { version = "0.3.28", features = ["executor"] }
+hyper = { version = "0.14.26", features = ["http1", "http2", "server", "tcp"] }
+tokio = { version = "1.28.1", features = ["io-util", "macros", "rt-multi-thread"] }
+tower = { version = "0.4.13", features = ["make"] }
