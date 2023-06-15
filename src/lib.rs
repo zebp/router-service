@@ -19,7 +19,7 @@
 //!         println!("Got request with headers: {:#?}", req.headers());
 //!         Response::builder().body(Body::empty())
 //!     });
-//! 
+//!
 //!  let addr = ([127, 0, 0, 1], 3030).into();
 //!  Server::bind(&addr)
 //!     .serve(Shared::new(router))

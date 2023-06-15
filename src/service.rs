@@ -1,14 +1,15 @@
 use std::{
+    collections::HashMap,
     future::Future,
     pin::Pin,
-    task::{Context, Poll}, collections::HashMap,
+    task::{Context, Poll},
 };
 
-use futures_util::{future::{BoxFuture}, FutureExt};
+use futures_util::{future::BoxFuture, FutureExt};
 use http::{Request, Response, StatusCode};
 use tower::Service;
 
-use crate::{Router, RouteContext};
+use crate::{RouteContext, Router};
 
 impl<Body, Data, Error> Service<Request<Body>> for Router<Body, Data, Error>
 where
