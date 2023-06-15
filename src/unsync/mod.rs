@@ -10,6 +10,8 @@ use crate::handler::*;
 
 pub use crate::service::ResponseFuture;
 
+mod service;
+
 #[derive(Default)]
 struct Route<Body, Data, Error> {
     handlers: HashMap<Method, AsyncUnsyncHandler<Body, Data, Error>>,
@@ -25,7 +27,7 @@ struct Route<Body, Data, Error> {
 ///
 /// use http::{Request, Response, StatusCode};
 /// use tower::Service;
-/// use router_service::Router;
+/// use router_service::unsync::Router;
 ///
 /// let mut router = Router::new()
 ///     .get("/", |_, _| async move {
@@ -68,7 +70,7 @@ where
     ///
     /// use http::{Request, Response, StatusCode};
     /// use tower::Service;
-    /// use router_service::Router;
+    /// use router_service::unsync::Router;
     ///
     /// let mut router = Router::with_data(42)
     ///     .get("/", |_, data| async move {
@@ -255,7 +257,7 @@ mod tests {
     use http::{Method, Request, Response};
     use tower::Service;
 
-    use crate::Router;
+    use crate::unsync::Router;
 
     #[test]
     fn not_found() {
