@@ -1,37 +1,4 @@
-#![forbid(missing_docs)]
-//! A simple no-frills router that can be used as a [`Service`](tower::Service).
-//!
-//! # Example
-//! ```no_run
-//! # use tokio::runtime::Builder;
-//! # let rt  = Builder::new_multi_thread().enable_all().build().unwrap();
-//! # rt.block_on(async {
-//! use std::convert::Infallible;
-//! use std::net::SocketAddr;
-//!
-//! use http::{Request, Response, StatusCode};
-//! use hyper::{Server, Body};
-//! use tower::{Service, make::Shared};
-//! use router_service::Router;
-//!
-//! let mut router = Router::new()
-//!     .get("/", |req, _| async move {
-//!         println!("Got request with headers: {:#?}", req.headers());
-//!         Response::builder().body(Body::empty())
-//!     });
-//!
-//!  let addr = ([127, 0, 0, 1], 3030).into();
-//!  Server::bind(&addr)
-//!     .serve(Shared::new(router))
-//!     .await
-//!     .expect("error running server");
-//! # });
-//! ```
-
-mod handler;
-mod service;
-pub mod unsync;
-
+//! An unsynchronized router that can be used as a [`Service`](tower::Service).
 use std::future::Future;
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -45,8 +12,8 @@ pub use crate::service::ResponseFuture;
 
 #[derive(Default)]
 struct Route<Body, Data, Error> {
-    handlers: HashMap<Method, AsyncHandler<Body, Data, Error>>,
-    catchall: Option<AsyncHandler<Body, Data, Error>>,
+    handlers: HashMap<Method, AsyncUnsyncHandler<Body, Data, Error>>,
+    catchall: Option<AsyncUnsyncHandler<Body, Data, Error>>,
 }
 
 /// A router that can be used as a [`Service`](tower::Service).
@@ -125,8 +92,8 @@ where
     pub fn get<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::GET, handler)
     }
@@ -135,8 +102,8 @@ where
     pub fn post<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::POST, handler)
     }
@@ -145,8 +112,8 @@ where
     pub fn put<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::PUT, handler)
     }
@@ -155,8 +122,8 @@ where
     pub fn delete<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::DELETE, handler)
     }
@@ -165,8 +132,8 @@ where
     pub fn head<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::HEAD, handler)
     }
@@ -175,8 +142,8 @@ where
     pub fn options<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::DELETE, handler)
     }
@@ -185,8 +152,8 @@ where
     pub fn patch<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         self.insert_handler(path, Method::PATCH, handler)
     }
@@ -195,8 +162,8 @@ where
     pub fn any<HandlerFn, Fut>(self, path: impl AsRef<str>, handler: HandlerFn) -> Self
     where
         HandlerFn: Fn(Request<Body>, RouteContext<Data>) -> Fut,
-        HandlerFn: Sync + Send + 'static,
-        Fut: Future<Output = Result<Response<Body>, Error>> + Send + Sync + 'static,
+        HandlerFn: 'static,
+        Fut: Future<Output = Result<Response<Body>, Error>> + 'static,
     {
         let mut inner = self.inner.write().unwrap();
 
@@ -221,13 +188,14 @@ where
 
     fn insert_handler<H>(self, path: impl AsRef<str>, method: Method, handler: H) -> Self
     where
-        H: Into<AsyncHandler<Body, Data, Error>>,
+        H: Into<AsyncUnsyncHandler<Body, Data, Error>>,
     {
         let mut inner = self.inner.write().unwrap();
         if let Ok(existing) = inner.at_mut(path.as_ref()) {
             existing.value.handlers.insert(method, handler.into());
         } else {
-            let mut handlers: HashMap<Method, AsyncHandler<Body, Data, Error>> = HashMap::new();
+            let mut handlers: HashMap<Method, AsyncUnsyncHandler<Body, Data, Error>> =
+                HashMap::new();
             handlers.insert(method, handler.into());
 
             inner
